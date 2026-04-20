@@ -18,7 +18,6 @@
         .setting-title { margin-top: 0; font-weight: bold; color: #495057; font-size: 14px; margin-bottom: 10px; display: block; }
         
         .select-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
-        /* ターゲット1900用の3分割グリッド */
         .select-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 10px; }
         
         .btn-opt { 
@@ -131,7 +130,6 @@
         btn.classList.toggle('active');
     }
 
-    // Stageボタンが押された時、選ばれたすべての範囲を計算して自由指定ボックスに反映
     function toggleStageBtn(btn) {
         btn.classList.toggle('active');
         
@@ -154,11 +152,10 @@
 
     async function startTest(mode) {
         currentMode = mode;
-        const count = document.getElementById('question-count').value;
-        const selectedRanges = [];
+        const count = parseInt(document.getElementById('question-count').value);
 
-        // 通常モードの時のみ、範囲指定をチェックする
         if (mode === 'normal') {
+            const selectedRanges = [];
             const activeStages = document.querySelectorAll('.stage-btn.active');
             activeStages.forEach(btn => {
                 selectedRanges.push([
@@ -170,7 +167,6 @@
             const customBtn = document.getElementById('custom-range-toggle');
             if (customBtn.classList.contains('active')) {
                 const cStart = parseInt(document.getElementById('custom-start').value) || 1;
-                // 最大値を1900に変更
                 const cEnd = parseInt(document.getElementById('custom-end').value) || 1900;
                 selectedRanges.push([cStart, cEnd]);
             }
@@ -179,18 +175,31 @@
                 alert("出題範囲を少なくとも1つ選択（青色に）してください。");
                 return;
             }
-        }
 
-        const response = await fetch('/get_words', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({mode: mode, count: count, ranges: selectedRanges})
-        });
+            // サーバーから指定範囲の単語を取得
+            const response = await fetch('/get_words', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({count: count, ranges: selectedRanges})
+            });
+            const data = await response.json();
+            if(data.error) { alert(data.error); return; }
+            words = data.words;
+
+        } else if (mode === 'weak') {
+            // 苦手モード: サーバーと通信せず、ブラウザの記憶から取得する！
+            let savedWeakWords = JSON.parse(localStorage.getItem('target1900_weak') || '[]');
+            
+            if (savedWeakWords.length === 0) {
+                alert("苦手な単語はまだ登録されていません。\n通常モードで学習して「✕ 苦手」をつけると、ここに登録されます！");
+                return;
+            }
+            
+            // 登録されている単語をシャッフルして、出題数分だけ取り出す
+            savedWeakWords.sort(() => Math.random() - 0.5);
+            words = savedWeakWords.slice(0, Math.min(count, savedWeakWords.length));
+        }
         
-        const data = await response.json();
-        if(data.error) { alert(data.error); return; }
-        
-        words = data.words;
         currentIndex = 0;
         correctWords = [];
         incorrectWords = [];
@@ -223,26 +232,40 @@
     function markIncorrect() { incorrectWords.push(words[currentIndex]); nextCard(); }
     function nextCard() { currentIndex++; isFront = true; updateDisplay(); }
 
-    async function finishTest() {
+    function finishTest() {
         document.getElementById('test-screen').classList.add('hidden');
         document.getElementById('result-screen').classList.remove('hidden');
         document.getElementById('score-display').innerText = `${words.length}問中 ${correctWords.length}問正解`;
 
-        await fetch('/save_results', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                mode: currentMode,
-                correct_words: correctWords,
-                incorrect_words: incorrectWords
-            })
-        });
-        document.getElementById('saving-text').innerText = "学習記録を保存しました。";
+        // === 苦手単語をブラウザ(LocalStorage)に保存する処理 ===
+        let savedWeakWords = JSON.parse(localStorage.getItem('target1900_weak') || '[]');
+        let weakDict = {};
+        
+        // 既存の苦手単語を辞書にまとめる（重複防止）
+        savedWeakWords.forEach(w => weakDict[w.Number] = w);
+
+        // 新たに間違えた単語を追加
+        incorrectWords.forEach(w => weakDict[w.Number] = w);
+
+        // 苦手モードで正解した単語は、苦手リストから削除
+        if (currentMode === 'weak') {
+            correctWords.forEach(w => {
+                if (weakDict[w.Number]) {
+                    delete weakDict[w.Number];
+                }
+            });
+        }
+
+        // オブジェクトから配列に戻して、ブラウザに保存！
+        savedWeakWords = Object.values(weakDict);
+        localStorage.setItem('target1900_weak', JSON.stringify(savedWeakWords));
+        // ===============================================
+
+        document.getElementById('saving-text').innerText = "学習記録をお使いの端末に保存しました！";
     }
 
     // キー操作の制御
     document.addEventListener('keydown', (e) => {
-        // 結果画面が表示されている時の処理（EnterかSpaceでタイトルに戻る）
         if (!document.getElementById('result-screen').classList.contains('hidden')) {
             if (e.code === 'Space' || e.code === 'Enter') {
                 e.preventDefault();
@@ -251,26 +274,19 @@
             return; 
         }
 
-        // テスト画面が表示されていない時は何もしない
         if (document.getElementById('test-screen').classList.contains('hidden')) return;
 
-        // テスト中のキー操作
         if ((e.code === 'Space' || e.code === 'Enter') && isFront) { 
-            // 表面（英語）の時：SpaceかEnterで裏面（答え）を見る
             e.preventDefault(); 
             flipCard(); 
         } else if (e.code === 'ArrowLeft' && !isFront) {
-            // 裏面の時：左矢印で不正解
             markIncorrect();
         } else if (e.code === 'ArrowRight' && !isFront) {
-            // 裏面の時：右矢印で正解
             markCorrect();
         } else if (e.code === 'Enter' && !isFront) {
-            // 裏面の時：Enterで英語と日本語を入れ替える
             e.preventDefault();
             const wordDisplay = document.getElementById('word-display');
             const currentWord = words[currentIndex];
-            // 現在の表示が日本語なら英語に、英語なら日本語に切り替え
             if (wordDisplay.innerText === currentWord.Japanese) {
                 wordDisplay.innerText = currentWord.English;
             } else {
