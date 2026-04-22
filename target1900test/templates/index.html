@@ -37,7 +37,19 @@
         .btn-half { width: 48%; }
         .btn-green { background-color: #28a745; color: white; }
         .btn-wrong { background-color: #e03131; color: white; }
+        .btn-list { width: 100%; background-color: #fff4e6; color: #d9480f; border: 1px solid #ffd8a8; margin-bottom: 20px; }
+        
         .hidden { display: none !important; }
+
+        .mistake-box { margin-top: 5px; text-align: left; background: #fff; border: 1px solid #ced4da; border-radius: 8px; max-height: 400px; overflow-y: auto; margin-bottom: 20px; }
+        .mistake-item { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-bottom: 1px solid #f1f3f5; font-size: 15px; }
+        .mistake-item:nth-child(even) { background-color: #f8f9fa; }
+        .mistake-item:last-child { border-bottom: none; }
+        
+        .mistake-left { display: flex; align-items: center; flex: 1; }
+        .mistake-num { color: #6c757d; font-size: 13px; font-family: monospace; font-weight: bold; width: 45px; margin-right: 5px; }
+        .mistake-eng { font-weight: bold; color: #333; } 
+        .mistake-jap { color: #e03131; font-weight: bold; text-align: right; flex: 1; margin-left: 10px; word-break: break-word; } 
     </style>
 </head>
 <body>
@@ -46,6 +58,11 @@
     <div id="setup-screen">
         <h1>ターゲット1900</h1>
         <div class="subtitle">Web Test Application</div>
+
+        <button id="mistake-list-btn" class="btn-action btn-list hidden" onclick="showMistakeScreen()">
+            📝 苦手な単語を確認する (<span id="mistake-count">0</span>語)
+        </button>
+
         <div class="setting-box">
             <span class="setting-title">■ 出題数</span>
             <div class="select-grid">
@@ -74,6 +91,15 @@
         <button class="btn-main btn-red" onclick="startTest('weak')">苦手克服モード</button>
     </div>
 
+    <div id="mistake-screen" class="hidden">
+        <h2 style="color: #e03131; margin-top: 10px;">要復習リスト</h2>
+        <div class="subtitle" id="mistake-screen-subtitle">現在登録されている苦手な単語です</div>
+        <div class="mistake-box" id="full-mistake-list"></div>
+        
+        <button id="start-weak-test-btn" class="btn-main btn-red" onclick="startTest('weak')" style="margin-bottom: 10px;">この単語でテストを開始する</button>
+        <button class="btn-main btn-blue" onclick="hideMistakeScreen()">ホームに戻る</button>
+    </div>
+
     <div id="test-screen" class="hidden">
         <div class="number" id="word-number">No.0000</div>
         <div class="status" id="status-text">1 / 10</div>
@@ -89,14 +115,66 @@
 
     <div id="result-screen" class="hidden">
         <h2>Result</h2>
-        <div class="card" id="score-display" style="font-size: 32px; cursor: default;">0/0</div>
-        <p id="saving-text" style="color: #28a745; font-weight: bold;"></p>
+        <div class="card" id="score-display" style="font-size: 32px; cursor: default; margin: 20px 0; min-height: 60px;">0/0</div>
+        <p id="saving-text" style="color: #28a745; font-weight: bold; margin-top: 15px;"></p>
         <button class="btn-main btn-blue" onclick="location.reload()">タイトルに戻る</button>
     </div>
 </div>
 
 <script>
     let words = []; let currentMode = 'normal'; let currentIndex = 0; let isFront = true; let correctWords = []; let incorrectWords = [];
+    
+    document.addEventListener('DOMContentLoaded', () => {
+        updateMistakeCount();
+    });
+
+    // 修正：0個の時はボタンを非表示にし、1個以上ある時だけ表示する
+    function updateMistakeCount() {
+        let saved = JSON.parse(localStorage.getItem('target1900_weak') || '[]');
+        const mistakeBtn = document.getElementById('mistake-list-btn');
+        if (saved.length > 0) {
+            mistakeBtn.classList.remove('hidden');
+            document.getElementById('mistake-count').innerText = saved.length;
+        } else {
+            mistakeBtn.classList.add('hidden');
+        }
+    }
+
+    function showMistakeScreen() {
+        let saved = JSON.parse(localStorage.getItem('target1900_weak') || '[]');
+        const list = document.getElementById('full-mistake-list');
+        const testBtn = document.getElementById('start-weak-test-btn');
+        list.innerHTML = ''; 
+        
+        if (saved.length > 0) {
+            testBtn.style.display = 'block'; 
+            saved.sort((a, b) => parseInt(a.Number) - parseInt(b.Number));
+            saved.forEach(w => {
+                const item = document.createElement('div');
+                item.className = 'mistake-item';
+                item.innerHTML = `
+                    <div class="mistake-left">
+                        <span class="mistake-num">No.${w.Number}</span>
+                        <span class="mistake-eng">${w.English}</span>
+                    </div>
+                    <span class="mistake-jap">${w.Japanese}</span>
+                `;
+                list.appendChild(item);
+            });
+        } else {
+            testBtn.style.display = 'none'; 
+            list.innerHTML = '<div style="text-align:center; color:#666; padding: 30px 10px;">現在、苦手な単語は登録されていません。<br>素晴らしいです！✨</div>';
+        }
+        
+        document.getElementById('setup-screen').classList.add('hidden');
+        document.getElementById('mistake-screen').classList.remove('hidden');
+    }
+
+    function hideMistakeScreen() {
+        document.getElementById('mistake-screen').classList.add('hidden');
+        document.getElementById('setup-screen').classList.remove('hidden');
+    }
+
     function setCount(num, btn) { document.getElementById('question-count').value = num; document.querySelectorAll('.count-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
     function clearStageSelection() { document.querySelectorAll('.stage-btn.active').forEach(b => b.classList.remove('active')); }
     function toggleStageBtn(btn) {
@@ -116,11 +194,8 @@
 
     function handleCardClick() {
         if (document.getElementById('test-screen').classList.contains('hidden')) return;
-        if (isFront) {
-            flipCard();
-        } else {
-            toggleWord();
-        }
+        if (isFront) flipCard();
+        else toggleWord();
     }
 
     function toggleWord() {
@@ -154,8 +229,11 @@
             words = saved.slice(0, count);
         }
         currentIndex = 0; correctWords = []; incorrectWords = [];
+        
         document.getElementById('setup-screen').classList.add('hidden');
+        document.getElementById('mistake-screen').classList.add('hidden');
         document.getElementById('test-screen').classList.remove('hidden');
+        
         updateDisplay();
     }
     function updateDisplay() {
@@ -171,10 +249,12 @@
     function markCorrect() { correctWords.push(words[currentIndex]); nextCard(); }
     function markIncorrect() { incorrectWords.push(words[currentIndex]); nextCard(); }
     function nextCard() { currentIndex++; isFront = true; updateDisplay(); }
+    
     function finishTest() {
         document.getElementById('test-screen').classList.add('hidden');
         document.getElementById('result-screen').classList.remove('hidden');
         document.getElementById('score-display').innerText = `${words.length}問中 ${correctWords.length}問正解`;
+
         let saved = JSON.parse(localStorage.getItem('target1900_weak') || '[]');
         let weakDict = {}; saved.forEach(w => weakDict[w.Number] = w);
         incorrectWords.forEach(w => weakDict[w.Number] = w);
