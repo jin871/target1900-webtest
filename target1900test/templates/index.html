@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>システム英単語 Webテスト</title>
+    <title>ターゲット1900 Webテスト</title>
     <style>
         * { box-sizing: border-box; } 
         body { font-family: 'Helvetica Neue', Arial, sans-serif; background-color: #f0f2f5; text-align: center; color: #333; margin: 0; padding: 15px; }
@@ -17,7 +17,7 @@
         .setting-box { background: #f8f9fa; padding: 15px; border-radius: 10px; margin-bottom: 20px; text-align: left; border: 1px solid #e9ecef; }
         .setting-title { margin-top: 0; font-weight: bold; color: #495057; font-size: 13px; margin-bottom: 10px; display: block; }
         .select-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
-        .select-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 10px; }
+        .select-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 10px; }
         .btn-opt { padding: 10px 2px; font-size: 12px; background-color: #fff; border: 1px solid #ced4da; border-radius: 6px; cursor: pointer; }
         .btn-opt.active { background-color: #0056b3; color: white; border-color: #0056b3; }
         .btn-main { padding: 16px; font-size: 18px; margin: 8px 0; cursor: pointer; border: none; border-radius: 8px; font-weight: bold; width: 100%; }
@@ -57,7 +57,7 @@
 
 <div id="app-container">
     <div id="setup-screen">
-        <h1>システム英単語</h1>
+        <h1>ターゲット1900</h1>
         <div class="subtitle">Web Test Application</div>
 
         <button id="mistake-list-btn" class="btn-action btn-list hidden" onclick="showMistakeScreen()">
@@ -75,18 +75,17 @@
             <input type="hidden" id="question-count" value="10">
         </div>
         <div class="setting-box">
-            <span class="setting-title">■ 範囲を選択（Stage指定）</span>
-            <div class="select-grid-2">
-                <button class="btn-opt stage-btn active" data-start="1" data-end="600" onclick="toggleStageBtn(this)">Stage 1<br>(1-600)</button>
-                <button class="btn-opt stage-btn" data-start="601" data-end="1200" onclick="toggleStageBtn(this)">Stage 2<br>(601-1200)</button>
-                <button class="btn-opt stage-btn" data-start="1201" data-end="1700" onclick="toggleStageBtn(this)">Stage 3<br>(1201-1700)</button>
-                <button class="btn-opt stage-btn" data-start="1701" data-end="2027" onclick="toggleStageBtn(this)">Stage 4<br>(1701-2027)</button>
+            <span class="setting-title">■ 範囲を選択（Part指定）</span>
+            <div class="select-grid-3">
+                <button class="btn-opt stage-btn active" data-start="1" data-end="800" onclick="toggleStageBtn(this)">Part 1<br>(1-800)</button>
+                <button class="btn-opt stage-btn" data-start="801" data-end="1500" onclick="toggleStageBtn(this)">Part 2<br>(801-1500)</button>
+                <button class="btn-opt stage-btn" data-start="1501" data-end="1900" onclick="toggleStageBtn(this)">Part 3<br>(1501-1900)</button>
             </div>
             <div class="custom-inputs">
                 <span>直接入力:</span>
-                <input type="number" id="custom-start" value="1" min="0" max="2027" step="100" oninput="clearStageSelection()" onkeydown="if(event.key === 'Enter') startTest('normal')">
+                <input type="number" id="custom-start" value="1" min="0" max="1900" step="100" oninput="clearStageSelection()" onkeydown="if(event.key === 'Enter') startTest('normal')">
                 <span style="color: #999;">〜</span>
-                <input type="number" id="custom-end" value="600" min="0" max="2027" step="100" oninput="clearStageSelection()" onkeydown="if(event.key === 'Enter') startTest('normal')">
+                <input type="number" id="custom-end" value="800" min="0" max="1900" step="100" oninput="clearStageSelection()" onkeydown="if(event.key === 'Enter') startTest('normal')">
             </div>
         </div>
         <button class="btn-main btn-blue" onclick="startTest('normal')">通常テスト開始</button>
@@ -130,8 +129,9 @@
         updateMistakeCount();
     });
 
+    // 修正：0個の時はボタンを非表示にし、1個以上ある時だけ表示する
     function updateMistakeCount() {
-        let saved = JSON.parse(localStorage.getItem('weak_words') || '[]');
+        let saved = JSON.parse(localStorage.getItem('target1900_weak') || '[]');
         const mistakeBtn = document.getElementById('mistake-list-btn');
         if (saved.length > 0) {
             mistakeBtn.classList.remove('hidden');
@@ -142,7 +142,7 @@
     }
 
     function showMistakeScreen() {
-        let saved = JSON.parse(localStorage.getItem('weak_words') || '[]');
+        let saved = JSON.parse(localStorage.getItem('target1900_weak') || '[]');
         const list = document.getElementById('full-mistake-list');
         const testBtn = document.getElementById('start-weak-test-btn');
         list.innerHTML = ''; 
@@ -224,7 +224,7 @@
             if(data.error) { alert(data.error); return; }
             words = data.words;
         } else {
-            let saved = JSON.parse(localStorage.getItem('weak_words') || '[]');
+            let saved = JSON.parse(localStorage.getItem('target1900_weak') || '[]');
             if (saved.length === 0) { alert("苦手な単語がありません。"); return; }
             saved.sort(() => Math.random() - 0.5);
             words = saved.slice(0, count);
@@ -256,11 +256,11 @@
         document.getElementById('result-screen').classList.remove('hidden');
         document.getElementById('score-display').innerText = `${words.length}問中 ${correctWords.length}問正解`;
 
-        let saved = JSON.parse(localStorage.getItem('weak_words') || '[]');
+        let saved = JSON.parse(localStorage.getItem('target1900_weak') || '[]');
         let weakDict = {}; saved.forEach(w => weakDict[w.Number] = w);
         incorrectWords.forEach(w => weakDict[w.Number] = w);
         if (currentMode === 'weak') correctWords.forEach(w => { if (weakDict[w.Number]) delete weakDict[w.Number]; });
-        localStorage.setItem('weak_words', JSON.stringify(Object.values(weakDict)));
+        localStorage.setItem('target1900_weak', JSON.stringify(Object.values(weakDict)));
         document.getElementById('saving-text').innerText = "記録を保存しました。";
     }
 
